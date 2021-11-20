@@ -31,19 +31,17 @@ namespace ContosoUniversity
 
         private static void CreateDbIfNotExists(IHost host)
         {
-            using (var scope = host.Services.CreateScope())
+            using var scope = host.Services.CreateScope();
+            var services = scope.ServiceProvider;
+            try
             {
-                var services = scope.ServiceProvider;
-                try
-                {
-                    var Context = services.GetRequiredService<SchoolContext>();
-                    DbInitializer.Initialize(Context);
-                }
-                catch (Exception ex)
-                {
-                    var logger = services.GetRequiredService<ILogger<Program>>();
-                    logger.LogError(ex, "Error occured creating DB");
-                }
+                var Context = services.GetRequiredService<SchoolContext>();
+                DbInitializer.Initialize(Context);
+            }
+            catch (Exception ex)
+            {
+                var logger = services.GetRequiredService<ILogger<Program>>();
+                logger.LogError(ex, "Error occured creating DB");
             }
         }
     }
