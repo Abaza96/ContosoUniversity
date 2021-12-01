@@ -20,15 +20,32 @@ namespace ContosoUniversity.Controllers
         }
 
         // GET: Students
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(string sortOrder, string searchString)
         {
-            return View(await _context.Students.ToListAsync());
-        }
+            ViewBag.FNameSortParm = String.IsNullOrEmpty(sortOrder) ? "FName_desc" : "";
+            ViewBag.NameSortParm = String.IsNullOrEmpty(sortOrder) ? "Name_desc" : "Name_asc";
+            ViewBag.DateSortParm = sortOrder == "Date" ? "Date_desc" : "Date";
+            ViewBag.SearchFilter = searchString;
 
-        public IActionResult AllStudents()
-        {
-            return View(_context.Students.ToList());
+            var students = _context.Students.Select(q => q);
+            if (!String.IsNullOrEmpty(searchString))
+            {
+                students = students.Where(s => s.LastName.ToUpper().Contains(searchString.ToUpper())
+                                       || s.FirstName.ToUpper().Contains(searchString.ToUpper()));
+            }
+            students = sortOrder switch
+            {
+                "Name_asc" => students.OrderBy(s => s.LastName),
+                "Name_desc" => students.OrderByDescending(s => s.LastName),
+                "FName_desc" => students.OrderByDescending(s => s.FirstName),
+                "Date" => students.OrderBy(s => s.EnrollmentDate),
+                "Date_desc" => students.OrderByDescending(s => s.EnrollmentDate),
+                _ => students.OrderBy(s => s.FirstName),
+            };
+            return View(await students.AsNoTracking().ToListAsync());
         }
+        public IActionResult AllStudents() => View(_context.Students.ToList());
+        
 
         // GET: Students/Details/5
         public async Task<IActionResult> Details(int? id)
@@ -144,7 +161,7 @@ namespace ContosoUniversity.Controllers
         }
 
         // GET: Students/Delete/5
-        public async Task<IActionResult> Delete(int? id)
+        public async Task<IActionResult> Delete(int? id, bool? saveChngeError = false)
         {
             if (id == null)
             {
@@ -157,21 +174,31 @@ namespace ContosoUniversity.Controllers
             {
                 return NotFound();
             }
+            if (saveChngeError.GetValueOrDefault())
+            {
+                ViewData["ErrorMessage"] = "Deleting Failed, try again";
+            }
 
             return View(student);
         }
 
         // POST: Students/Delete/5
-        [HttpPost, ActionName("Delete")]
+        [HttpPost, ActionName("Delete")] //ActionName() is a method that relates this method with the passed param
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var student = await _context.Students.FindAsync(id);
-            _context.Students.Remove(student);
-            await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
+            try
+            {
+                var student = await _context.Students.FindAsync(id);
+                _context.Students.Remove(student);
+                await _context.SaveChangesAsync();
+                return RedirectToAction(nameof(Index));
+            }
+            catch (DbUpdateException)
+            {
+                return RedirectToAction("Delete", new { id, saveChangesError = true });
+            }
         }
-
         private bool StudentExists(int id) => _context.Students.Any(e => e.StudentID == id);
     }
 }
